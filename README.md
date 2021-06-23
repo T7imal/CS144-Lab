@@ -1,3 +1,9 @@
+# 传输层实验
+
+- 本实验要求实验者构造一个简单的IP路由器，以实现根据路由表进行路由的功能。
+- 路由(route)就是分组在因特网上从一台计算机传输到另一台计算机的实际路径。
+- 因特网上的每个路由器都存储有一张表，称为路由表(routing table)，路由器正是依据路由表的内容将各个 IP 分组转发到正确的去处。
+
 For build prereqs, see [the CS144 VM setup instructions](https://web.stanford.edu/class/cs144/vm_howto).
 
 ## Sponge quickstart
