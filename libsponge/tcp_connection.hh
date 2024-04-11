@@ -18,8 +18,17 @@ class TCPConnection {
 
     //! Should the TCPConnection stay active (and keep ACKing)
     //! for 10 * _cfg.rt_timeout milliseconds after both streams have ended,
-    //! in case the remote TCPConnection doesn't know we've received its whole stream?
+    //! in case the remote TCPConnection doesn't know we've received its whole
+    //! stream?
     bool _linger_after_streams_finish{true};
+
+    bool _connection_active = true;
+    size_t _time_since_last_segment_received = 0;
+    // size_t _time_since_last_segment_sent = 0;
+    // size_t _last_window_size = 0;
+
+    void _send_segments();
+    void _clean_shutdown();
 
   public:
     //! \name "Input" interface for the writer
@@ -28,14 +37,16 @@ class TCPConnection {
     //! \brief Initiate a connection by sending a SYN segment
     void connect();
 
-    //! \brief Write data to the outbound byte stream, and send it over TCP if possible
-    //! \returns the number of bytes from `data` that were actually written.
+    //! \brief Write data to the outbound byte stream, and send it over TCP if
+    //! possible \returns the number of bytes from `data` that were actually
+    //! written.
     size_t write(const std::string &data);
 
     //! \returns the number of `bytes` that can be written right now.
     size_t remaining_outbound_capacity() const;
 
-    //! \brief Shut down the outbound byte stream (still allows reading incoming data)
+    //! \brief Shut down the outbound byte stream (still allows reading incoming
+    //! data)
     void end_input_stream();
     //!@}
 
@@ -49,7 +60,8 @@ class TCPConnection {
     //! \name Accessors used for testing
 
     //!@{
-    //! \brief number of bytes sent and not yet acknowledged, counting SYN/FIN each as one byte
+    //! \brief number of bytes sent and not yet acknowledged, counting SYN/FIN
+    //! each as one byte
     size_t bytes_in_flight() const;
     //! \brief number of bytes not yet reassembled
     size_t unassembled_bytes() const;
@@ -70,13 +82,15 @@ class TCPConnection {
 
     //! \brief TCPSegments that the TCPConnection has enqueued for transmission.
     //! \note The owner or operating system will dequeue these and
-    //! put each one into the payload of a lower-layer datagram (usually Internet datagrams (IP),
-    //! but could also be user datagrams (UDP) or any other kind).
+    //! put each one into the payload of a lower-layer datagram (usually
+    //! Internet datagrams (IP), but could also be user datagrams (UDP) or any
+    //! other kind).
     std::queue<TCPSegment> &segments_out() { return _segments_out; }
 
     //! \brief Is the connection still alive in any way?
-    //! \returns `true` if either stream is still running or if the TCPConnection is lingering
-    //! after both streams have finished (e.g. to ACK retransmissions from the peer)
+    //! \returns `true` if either stream is still running or if the
+    //! TCPConnection is lingering after both streams have finished (e.g. to ACK
+    //! retransmissions from the peer)
     bool active() const;
     //!@}
 
@@ -84,10 +98,12 @@ class TCPConnection {
     explicit TCPConnection(const TCPConfig &cfg) : _cfg{cfg} {}
 
     //! \name construction and destruction
-    //! moving is allowed; copying is disallowed; default construction not possible
+    //! moving is allowed; copying is disallowed; default construction not
+    //! possible
 
     //!@{
-    ~TCPConnection();  //!< destructor sends a RST if the connection is still open
+    ~TCPConnection();  //!< destructor sends a RST if the connection is still
+                       //!< open
     TCPConnection() = delete;
     TCPConnection(TCPConnection &&other) = default;
     TCPConnection &operator=(TCPConnection &&other) = default;

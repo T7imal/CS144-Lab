@@ -3,18 +3,22 @@
 
 #include "network_interface.hh"
 
+#include <cstdint>
+#include <memory>
 #include <optional>
 #include <queue>
+#include <vector>
 
 //! \brief A wrapper for NetworkInterface that makes the host-side
 //! interface asynchronous: instead of returning received datagrams
 //! immediately (from the `recv_frame` method), it stores them for
 //! later retrieval. Otherwise, behaves identically to the underlying
 //! implementation of NetworkInterface.
-class AsyncNetworkInterface : public NetworkInterface {
+class AsyncNetworkInterface : public NetworkInterface
+{
     std::queue<InternetDatagram> _datagrams_out{};
 
-  public:
+public:
     using NetworkInterface::NetworkInterface;
 
     //! Construct from a NetworkInterface
@@ -27,9 +31,11 @@ class AsyncNetworkInterface : public NetworkInterface {
     //! - If type is ARP reply, learn a mapping from the "target" fields.
     //!
     //! \param[in] frame the incoming Ethernet frame
-    void recv_frame(const EthernetFrame &frame) {
+    void recv_frame(const EthernetFrame &frame)
+    {
         auto optional_dgram = NetworkInterface::recv_frame(frame);
-        if (optional_dgram.has_value()) {
+        if (optional_dgram.has_value())
+        {
             _datagrams_out.push(std::move(optional_dgram.value()));
         }
     };
@@ -40,7 +46,8 @@ class AsyncNetworkInterface : public NetworkInterface {
 
 //! \brief A router that has multiple network interfaces and
 //! performs longest-prefix-match routing between them.
-class Router {
+class Router
+{
     //! The router's collection of network interfaces
     std::vector<AsyncNetworkInterface> _interfaces{};
 
@@ -49,11 +56,32 @@ class Router {
     //! datagram's destination address.
     void route_one_datagram(InternetDatagram &dgram);
 
-  public:
+    // struct Route
+    // {
+    //     uint32_t route_prefix;
+    //     uint8_t prefix_length;
+    //     std::optional<Address> next_hop;
+    //     size_t interface_num;
+    // };
+    // std::vector<Route> _routes{};
+
+    struct RadixNode
+    {
+        uint32_t route_prefix;
+        uint8_t prefix_length;
+        std::optional<Address> next_hop;
+        size_t interface_num;
+        std::vector<std::unique_ptr<RadixNode>> children{};
+        bool is_real_route = false;
+    };
+    RadixNode _root{};
+
+public:
     //! Add an interface to the router
     //! \param[in] interface an already-constructed network interface
     //! \returns The index of the interface after it has been added to the router
-    size_t add_interface(AsyncNetworkInterface &&interface) {
+    size_t add_interface(AsyncNetworkInterface &&interface)
+    {
         _interfaces.push_back(std::move(interface));
         return _interfaces.size() - 1;
     }
@@ -62,13 +90,10 @@ class Router {
     AsyncNetworkInterface &interface(const size_t N) { return _interfaces.at(N); }
 
     //! Add a route (a forwarding rule)
-    void add_route(const uint32_t route_prefix,
-                   const uint8_t prefix_length,
-                   const std::optional<Address> next_hop,
-                   const size_t interface_num);
+    void add_route(const uint32_t route_prefix, const uint8_t prefix_length, const std::optional<Address> next_hop, const size_t interface_num);
 
     //! Route packets between the interfaces
     void route();
 };
 
-#endif  // SPONGE_LIBSPONGE_ROUTER_HH
+#endif // SPONGE_LIBSPONGE_ROUTER_HH

@@ -1,12 +1,20 @@
 #ifndef SPONGE_LIBSPONGE_NETWORK_INTERFACE_HH
 #define SPONGE_LIBSPONGE_NETWORK_INTERFACE_HH
 
+#include "address.hh"
+#include "arp_message.hh"
 #include "ethernet_frame.hh"
+#include "ethernet_header.hh"
+#include "ipv4_datagram.hh"
 #include "tcp_over_ip.hh"
 #include "tun.hh"
 
+#include <cstddef>
+#include <cstdint>
+#include <map>
 #include <optional>
 #include <queue>
+#include <vector>
 
 //! \brief A "network interface" that connects IP (the internet layer, or network layer)
 //! with Ethernet (the network access layer, or link layer).
@@ -39,6 +47,19 @@ class NetworkInterface {
 
     //! outbound queue of Ethernet frames that the NetworkInterface wants sent
     std::queue<EthernetFrame> _frames_out{};
+
+    // IP 地址到 MAC 地址和 TTL 的映射
+    struct ArpEntry {
+        EthernetAddress mac;
+        size_t ttl;
+    };
+    size_t _arp_ttl = 30 * 1000;  // 30s
+    std::map<uint32_t, ArpEntry> _arp_table{};
+    // 等待 ARP 回复的数据报
+    std::vector<std::pair<InternetDatagram, Address>> _datagrams_waiting_arp{};
+    // 发送的 ARP 请求报文、等待时间
+    size_t _arp_request_ttl = 5 * 1000;  // 5s
+    std::map<uint32_t, size_t> _arp_requests_without_reply{};
 
   public:
     //! \brief Construct a network interface with given Ethernet (network-access-layer) and IP (internet-layer) addresses

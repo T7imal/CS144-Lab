@@ -7,19 +7,26 @@
 #include <list>
 #include <string>
 #include <utility>
+#include "buffer.hh"
 
 //! \brief An in-order byte stream.
 
 //! Bytes are written on the "input" side and read from the "output"
 //! side.  The byte stream is finite: the writer can end the input,
 //! and then no more bytes can be written.
-class ByteStream {
-  private:
+class ByteStream
+{
+private:
     // Your code here -- add private members as necessary.
+    BufferList _buffer;        // The buffer of bytes
+    size_t _capacity = 0;      // The capacity of the buffer
+    size_t _bytes_written = 0; // The number of bytes written
+    size_t _bytes_read = 0;    // The number of bytes read
+    bool _input_ended = false; // Flag indicating that the input has ended
 
-    bool _error{};  //!< Flag indicating that the stream suffered an error.
+    bool _error{}; //!< Flag indicating that the stream suffered an error.
 
-  public:
+public:
     //! Construct a stream with room for `capacity` bytes.
     ByteStream(const size_t capacity);
 
@@ -29,7 +36,7 @@ class ByteStream {
     //! Write a string of bytes into the stream. Write as many
     //! as will fit, and return how many were written.
     //! \returns the number of bytes accepted into the stream
-    size_t write(const std::string &data);
+    size_t write(const std::string& data);
 
     //! \returns the number of additional bytes that the stream has space for
     size_t remaining_capacity() const;
@@ -53,7 +60,8 @@ class ByteStream {
 
     //! Read (i.e., copy and then pop) the next "len" bytes of the stream
     //! \returns a vector of bytes read
-    std::string read(const size_t len) {
+    std::string read(const size_t len)
+    {
         const auto ret = peek_output(len);
         pop_output(len);
         return ret;
@@ -86,4 +94,4 @@ class ByteStream {
     //!@}
 };
 
-#endif  // SPONGE_LIBSPONGE_BYTE_STREAM_HH
+#endif // SPONGE_LIBSPONGE_BYTE_STREAM_HH

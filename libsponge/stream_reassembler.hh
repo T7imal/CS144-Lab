@@ -4,6 +4,7 @@
 #include "byte_stream.hh"
 
 #include <cstdint>
+#include <set>
 #include <string>
 
 //! \brief A class that assembles a series of excerpts from a byte stream (possibly out of order,
@@ -11,6 +12,18 @@
 class StreamReassembler {
   private:
     // Your code here -- add private members as necessary.
+
+    struct segment {
+        size_t begin = 0;
+        size_t length = 0;
+        std::string data = "";
+        bool operator<(const segment t) const { return begin < t.begin; }
+    };
+    std::set<segment> _segments = {};
+    size_t _next_index = 0;
+    bool _eof = false;
+    size_t _eof_index = 0;
+    void merge(segment &s1, const segment &s2);
 
     ByteStream _output;  //!< The reassembled in-order byte stream
     size_t _capacity;    //!< The maximum number of bytes

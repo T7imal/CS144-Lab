@@ -32,6 +32,20 @@ class TCPSender {
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
 
+    bool _syn = false;
+    bool _fin = false;
+
+    uint64_t _seqno_boundary = 0;
+    uint64_t _last_ackno = 0;
+    uint64_t _first_unacked_absolute_seqno = 0;
+
+    //! 还没被确认的segments
+    std::queue<TCPSegment> _unacked_segments{};
+
+    uint64_t _timer = 0;
+    unsigned int _consecutive_retransmissions = 0;
+    unsigned int _consecutive_timeouts = 0;
+
   public:
     //! Initialize a TCPSender
     TCPSender(const size_t capacity = TCPConfig::DEFAULT_CAPACITY,
@@ -87,6 +101,8 @@ class TCPSender {
     //! \brief relative seqno for the next byte to be sent
     WrappingInt32 next_seqno() const { return wrap(_next_seqno, _isn); }
     //!@}
+
+    std::queue<TCPSegment> &unacked_segments() { return _unacked_segments; }
 };
 
 #endif  // SPONGE_LIBSPONGE_TCP_SENDER_HH
