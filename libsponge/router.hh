@@ -71,10 +71,11 @@ class Router
         uint8_t prefix_length;
         std::optional<Address> next_hop;
         size_t interface_num;
-        std::vector<std::unique_ptr<RadixNode>> children{};
+        std::shared_ptr<RadixNode> left_child;
+        std::shared_ptr<RadixNode> right_child;
         bool is_real_route = false;
     };
-    RadixNode _root{};
+    std::shared_ptr<RadixNode> _root = std::make_shared<RadixNode>(RadixNode{0, 0, {}, 0, nullptr, nullptr, false});
 
 public:
     //! Add an interface to the router

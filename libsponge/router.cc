@@ -1,4 +1,5 @@
 #include "router.hh"
+#include <sys/types.h>
 
 #include "address.hh"
 
@@ -39,102 +40,125 @@ void Router::add_route(const uint32_t route_prefix, const uint8_t prefix_length,
 
     // _routes.push_back(Route{route_prefix, prefix_length, next_hop, interface_num});
 
-    RadixNode *node = &_root;
+    // RadixNode *node = &_root;
+    std::shared_ptr<RadixNode> node = _root;
     // 找到最长匹配的节点，在此节点下添加新的节点
     size_t already_matched_bits = 0;
-    while (!node->children.empty())
+    while (node->left_child != nullptr || node->right_child != nullptr)
     {
-        bool need_add_new_child = true;
-        for (auto &child : node->children)
+        if (node->left_child != nullptr)
         {
-            uint32_t mask = 0xffffffff << (32 - child->prefix_length);
-            if ((route_prefix & mask) == child->route_prefix)
+            uint32_t mask = 0xffffffff << (32 - node->left_child->prefix_length);
+            if ((route_prefix & mask) == node->left_child->route_prefix)
             {
-                already_matched_bits = child->prefix_length;
-                node = child.get();
-                need_add_new_child = false;
-                break;
+                already_matched_bits = node->left_child->prefix_length;
+                node = node->left_child;
+                continue;
             }
         }
-        if (need_add_new_child)
+        if (node->right_child != nullptr)
         {
-            break;
+            uint32_t mask = 0xffffffff << (32 - node->right_child->prefix_length);
+            if ((route_prefix & mask) == node->right_child->route_prefix)
+            {
+                already_matched_bits = node->right_child->prefix_length;
+                node = node->right_child;
+                continue;
+            }
         }
+        break;
     }
 
     if (already_matched_bits == prefix_length)
     {
-        if (node == &_root)
-        {
-            node->route_prefix = 0;
-            node->prefix_length = 0;
-            node->next_hop = next_hop;
-            node->interface_num = interface_num;
-        }
+        node->next_hop = next_hop;
+        node->interface_num = interface_num;
         node->is_real_route = true;
     }
     else
     {
-        // node.children为空，直接添加新节点
-        if (node->children.empty())
+        // 第already_matched_bits位为0，添加左节点；为1，添加右节点
+        bool next_bit = (route_prefix >> (31 - already_matched_bits)) & 1;
+        if (next_bit == 0)
         {
-            std::unique_ptr<RadixNode> new_node(new RadixNode{route_prefix, prefix_length, next_hop, interface_num});
-            new_node->is_real_route = true;
-            node->children.push_back(std::move(new_node));
+            // 左节点为空，直接添加新节点
+            if (node->left_child == nullptr)
+            {
+                std::shared_ptr<RadixNode> new_node(new RadixNode{route_prefix, prefix_length, next_hop, interface_num, {}, {}, true});
+                node->left_child = new_node;
+            }
+            // 左节点不为空，说明存在重叠，拆分重叠的节点
+            else
+            {
+                std::shared_ptr<RadixNode> overlap_node = node->left_child;
+                uint32_t tmp = overlap_node->route_prefix ^ route_prefix;
+                uint8_t new_prefix_length = already_matched_bits;
+                // 求出从高往低连续的0的个数，即新节点的前缀长度
+                while (((tmp >> (31 - new_prefix_length)) & 1) == 0)
+                {
+                    new_prefix_length++;
+                }
+                std::shared_ptr<RadixNode> new_node_1(new RadixNode{route_prefix, prefix_length, next_hop, interface_num, {}, {}, true});
+                std::shared_ptr<RadixNode> new_node_2(new RadixNode{overlap_node->route_prefix, overlap_node->prefix_length, overlap_node->next_hop,
+                                                                    overlap_node->interface_num, overlap_node->left_child, overlap_node->right_child,
+                                                                    overlap_node->is_real_route});
+                uint32_t mask = 0xffffffff << (32 - new_prefix_length);
+                overlap_node->prefix_length = new_prefix_length;
+                overlap_node->route_prefix = overlap_node->route_prefix & mask;
+                overlap_node->is_real_route = false;
+
+                // 根据新增节点的new_prefix_length+1位是0还是1，分别添加到左右节点
+                if (((route_prefix >> (31 - new_prefix_length)) & 1) == 0)
+                {
+                    overlap_node->left_child = new_node_1;
+                    overlap_node->right_child = new_node_2;
+                }
+                else
+                {
+                    overlap_node->left_child = new_node_2;
+                    overlap_node->right_child = new_node_1;
+                }
+            }
         }
         else
         {
-            // 检测node.children中是否有和新节点有重叠的节点，如果有，将重叠的节点拆分
-            RadixNode *overlap_node = nullptr;
-            int overlap_bits = 0;
-            for (auto &child : node->children)
+            // 右节点为空，直接添加新节点
+            if (node->right_child == nullptr)
             {
-                uint32_t tmp = route_prefix & child->route_prefix;
-                // 计算tmp从高位开始连续的1的个数
-                int count = 0;
-                for (int i = 31; i >= 0; i--)
-                {
-                    if ((tmp & (1 << i)) != 0)
-                    {
-                        count++;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-                if (count > node->prefix_length)
-                {
-                    overlap_node = child.get();
-                    overlap_bits = count;
-                }
+                std::unique_ptr<RadixNode> new_node(new RadixNode{route_prefix, prefix_length, next_hop, interface_num, {}, {}, true});
+                node->right_child = std::move(new_node);
             }
-            // 拆分重叠的节点
-            if (overlap_node != nullptr)
-            {
-                std::unique_ptr<RadixNode> new_node_1(new RadixNode{overlap_node->route_prefix,
-                                                                    overlap_node->prefix_length,
-                                                                    overlap_node->next_hop,
-                                                                    overlap_node->interface_num,
-                                                                    {},
-                                                                    overlap_node->is_real_route});
-                new_node_1->children = std::move(overlap_node->children);
-                std::unique_ptr<RadixNode> new_node_2(new RadixNode{route_prefix, prefix_length, next_hop, interface_num});
-                new_node_2->is_real_route = true;
-
-                overlap_node->route_prefix = overlap_node->route_prefix & (0xffffffff << (32 - overlap_bits));
-                overlap_node->prefix_length = overlap_bits;
-                overlap_node->is_real_route = false;
-                overlap_node->children.clear();
-                overlap_node->children.push_back(std::move(new_node_1));
-                overlap_node->children.push_back(std::move(new_node_2));
-            }
-            // 没有重叠的节点，直接添加新节点
+            // 右节点不为空，说明存在重叠，拆分重叠的节点
             else
             {
-                std::unique_ptr<RadixNode> new_node(new RadixNode{route_prefix, prefix_length, next_hop, interface_num});
-                new_node->is_real_route = true;
-                node->children.push_back(std::move(new_node));
+                std::shared_ptr<RadixNode> overlap_node = node->right_child;
+                uint32_t tmp = overlap_node->route_prefix ^ route_prefix;
+                uint8_t new_prefix_length = already_matched_bits;
+                // 求出从高往低连续的0的个数，即新节点的前缀长度
+                while (((tmp >> (31 - new_prefix_length)) & 1) == 0)
+                {
+                    new_prefix_length++;
+                }
+                std::shared_ptr<RadixNode> new_node_1(new RadixNode{route_prefix, prefix_length, next_hop, interface_num, {}, {}, true});
+                std::shared_ptr<RadixNode> new_node_2(new RadixNode{overlap_node->route_prefix, overlap_node->prefix_length, overlap_node->next_hop,
+                                                                    overlap_node->interface_num, overlap_node->left_child, overlap_node->right_child,
+                                                                    overlap_node->is_real_route});
+                uint32_t mask = 0xffffffff << (32 - new_prefix_length);
+                overlap_node->prefix_length = new_prefix_length;
+                overlap_node->route_prefix = overlap_node->route_prefix & mask;
+                overlap_node->is_real_route = false;
+
+                // 根据新增节点的new_prefix_length+1位是0还是1，分别添加到左右节点
+                if (((route_prefix >> (31 - new_prefix_length)) & 1) == 0)
+                {
+                    overlap_node->left_child = new_node_1;
+                    overlap_node->right_child = new_node_2;
+                }
+                else
+                {
+                    overlap_node->left_child = new_node_2;
+                    overlap_node->right_child = new_node_1;
+                }
             }
         }
     }
@@ -178,9 +202,8 @@ void Router::route_one_datagram(InternetDatagram &dgram)
     //     }
     // }
 
-    RadixNode *node = &_root;
-    bool need_continue = true;
-    while (need_continue)
+    std::shared_ptr<RadixNode> node = _root;
+    while (true)
     {
         if (node->is_real_route)
         {
@@ -194,39 +217,32 @@ void Router::route_one_datagram(InternetDatagram &dgram)
                 next_hop = Address::from_ipv4_numeric(dgram.header().dst);
             }
         }
-        if (node->children.empty())
+        if (node->left_child == nullptr && node->right_child == nullptr)
         {
-            need_continue = false;
             break;
         }
         else
         {
-            need_continue = false;
-            for (auto &child : node->children)
+            if (node->left_child)
             {
-                uint32_t mask = 0xffffffff << (32 - child->prefix_length);
-                if ((dgram.header().dst & mask) == child->route_prefix || child->prefix_length == 0)
+                uint32_t mask = 0xffffffff << (32 - node->left_child->prefix_length);
+                if ((dgram.header().dst & mask) == node->left_child->route_prefix)
                 {
-                    node = child.get();
-                    need_continue = true;
-                    break;
+                    node = node->left_child;
+                    continue;
                 }
             }
-            if (!need_continue)
+            if (node->right_child)
             {
-                if (node->is_real_route)
+                uint32_t mask = 0xffffffff << (32 - node->right_child->prefix_length);
+                if ((dgram.header().dst & mask) == node->right_child->route_prefix)
                 {
-                    max_match_interface = node->interface_num;
-                    if (node->next_hop.has_value())
-                    {
-                        next_hop = node->next_hop;
-                    }
-                    else
-                    {
-                        next_hop = Address::from_ipv4_numeric(dgram.header().dst);
-                    }
+                    node = node->right_child;
+                    continue;
                 }
             }
+            // 两个子节点都不匹配，结束
+            break;
         }
     }
 
