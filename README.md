@@ -1,8 +1,6 @@
 # 传输层实验
 
-- 本实验要求实验者构造一个简单的IP路由器，以实现根据路由表进行路由的功能。
-- 路由(route)就是分组在因特网上从一台计算机传输到另一台计算机的实际路径。
-- 因特网上的每个路由器都存储有一张表，称为路由表(routing table)，路由器正是依据路由表的内容将各个 IP 分组转发到正确的去处。
+已全部完成
 
 For build prereqs, see [the CS144 VM setup instructions](https://web.stanford.edu/class/cs144/vm_howto).
 
@@ -10,9 +8,9 @@ For build prereqs, see [the CS144 VM setup instructions](https://web.stanford.ed
 
 To set up your build directory:
 
-	$ mkdir -p <path/to/sponge>/build
-	$ cd <path/to/sponge>/build
-	$ cmake ..
+    $ mkdir -p <path/to/sponge>/build
+    $ cd <path/to/sponge>/build
+    $ cmake ..
 
 **Note:** all further commands listed below should be run from the `build` dir.
 
@@ -48,14 +46,14 @@ level of optimization. To choose the `Debug` target:
 
 The following targets are supported:
 
-- `Release` - optimizations
-- `Debug` - debug symbols and `-Og`
-- `RelASan` - release build with [ASan](https://en.wikipedia.org/wiki/AddressSanitizer) and
-  [UBSan](https://developers.redhat.com/blog/2014/10/16/gcc-undefined-behavior-sanitizer-ubsan/)
-- `RelTSan` - release build with
-  [ThreadSan](https://developer.mozilla.org/en-US/docs/Mozilla/Projects/Thread_Sanitizer)
-- `DebugASan` - debug build with ASan and UBSan
-- `DebugTSan` - debug build with ThreadSan
+-   `Release` - optimizations
+-   `Debug` - debug symbols and `-Og`
+-   `RelASan` - release build with [ASan](https://en.wikipedia.org/wiki/AddressSanitizer) and
+    [UBSan](https://developers.redhat.com/blog/2014/10/16/gcc-undefined-behavior-sanitizer-ubsan/)
+-   `RelTSan` - release build with
+    [ThreadSan](https://developer.mozilla.org/en-US/docs/Mozilla/Projects/Thread_Sanitizer)
+-   `DebugASan` - debug build with ASan and UBSan
+-   `DebugTSan` - debug build with ThreadSan
 
 Of course, you can combine all of the above, e.g.,
 
@@ -85,4 +83,5 @@ To format (you'll need `clang-format`):
 To see all available targets,
 
     $ make help
+
 # CS144-Lab
